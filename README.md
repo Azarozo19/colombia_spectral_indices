@@ -62,28 +62,6 @@ Cloudy pixels remain in the original ARD but are excluded from the composite.
 Index statistics with no accepted observation remain nodata; their
 `VALID_COUNT` value is zero.
 
-Before committing to a large run, compare three screening profiles directly
-from the cube's QAI rasters:
-
-```bash
-python scripts/qai_coverage_report.py \
-  --ard-dir /opb_mount/force_col_data/colombia_sentinel2_snapshot_2025_01_23/level2 \
-  --tile X0034_Y0036 \
-  --date-from 2025-01-01 \
-  --date-to 2025-03-31 \
-  --output /drive_mount/force_co/qai_coverage_X0034_Y0036.json
-```
-
-The report compares:
-
-- `strict`: rejects cloud buffer, opaque cloud, cirrus and cloud shadow;
-- `balanced`: allows cloud-buffer pixels but still rejects cloud and shadow;
-- `exploratory`: also allows shadow, for diagnosis only.
-
-Use the coverage and valid-observation histograms to choose a policy. For a
-production vegetation product, start with `strict`; consider `balanced` only
-if visual checks show that the extra coverage is trustworthy.
-
 ## Configure the run
 
 Edit [`config.yaml`](config.yaml). The most useful settings are:
