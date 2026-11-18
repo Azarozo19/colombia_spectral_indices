@@ -1,0 +1,65 @@
+job:
+  project_name: ant_spectral_indices_2025_test
+
+runtime:
+  # Results and temporary FORCE products are kept separate from the validated
+  # Level-2 cube. Expect a national run to require substantial free space.
+  process_folder: /drive_mount/force_co/ant_indices
+  force_ard_dir: /opb_mount/force_col_data/colombia_sentinel2_snapshot_2025_01_23/level2
+  force_grid_epsg: 9377
+  force_image: davidfrantz/force:3.10.04@sha256:5e744754d2c8b23060aa520c45c775b0e135667f3e4fb6d1c64de328b722c6d5
+  docker_cmd: docker
+  mounts:
+    - /drive_mount:/drive_mount
+    - /opb_mount:/opb_mount
+
+processing:
+  mode: UDF
+  execute: true
+  # Set to false for the first test if you only want FORCE's per-tile output.
+  mosaic: true
+  # Interactive debug mode: pause before and after every FORCE/Docker command.
+  hold: true
+
+inputs:
+  aois:
+    - /drive_mount/force_co/FORCE/aoi/antioquia.geojson
+
+parameters:
+  DATE_RANGE: 2025-01-18 2025-01-27
+  DOY_RANGE: 1 365
+  SENSORS: SEN2A SEN2B SEN2C
+  TARGET_SENSOR: SEN2L
+  SPECTRAL_ADJUST: false
+  RESOLUTION: 10
+
+  # Supported values: NDVI, EVI, NBR, NDMI. The output contains one median
+  # band per requested index, scaled by 10000 and stored as Int16.
+  INDICES: [NDVI, EVI, NBR, NDMI]
+  METRIC: MEDIAN
+  FILE_PYTHON: utils/templates/colombia_spectral_indices.py
+  PYTHON_TYPE: CHUNK
+
+  # FORCE masks these QAI conditions before the UDF receives reflectance.
+  SCREEN_QAI: >-
+    NODATA CLOUD_OPAQUE CLOUD_BUFFER CLOUD_CIRRUS CLOUD_SHADOW SNOW
+    SUBZERO SATURATION
+
+  STREAMING: false
+  OUTPUT_SUBFOLDERS: true
+  CHUNK_SIZE: 6000 6000
+  ABOVE_NOISE: 3
+  BELOW_NOISE: 1
+  NTHREAD_READ: 4
+  NTHREAD_COMPUTE: 5
+  NTHREAD_WRITE: 3
+
+mosaic_output:
+  compression: ZSTD
+  interleave: BAND
+  zstd_level: 15
+  block_size: 512
+  predictor: 2
+  build_overviews: true
+  overview_resampling: average
+  overview_levels: [2, 4, 8, 16, 32, 64, 128]
