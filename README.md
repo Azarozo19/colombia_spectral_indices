@@ -31,6 +31,10 @@ The default UDF produces four Int16 bands:
 Values are multiplied by 10,000. For example, stored NDVI `6500` means
 physical NDVI `0.65`. Nodata is `-9999`.
 
+The normalized-difference indices require non-negative input reflectance and
+are constrained to their physical `[-1, 1]` range. EVI values outside the
+conservative `[-1, 1.5]` range are treated as invalid rather than clipped.
+
 For each index, the UDF first calculates the value for every accepted
 acquisition and then takes the pixel-wise median over the ten-day snapshot.
 This is a multi-date clear-pixel composite, not a single-date observation.

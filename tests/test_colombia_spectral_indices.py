@@ -52,6 +52,18 @@ class ColombiaSpectralIndicesTest(unittest.TestCase):
 
         self.assertEqual(out[0, 0, 0], 5000)
 
+    def test_negative_reflectance_does_not_create_extreme_ndvi(self):
+        observation = np.array(
+            [1000, 2000, -100, 0, 0, 0, 50, 50, 3000, 1000],
+            dtype=np.int16,
+        ).reshape((1, 10, 1, 1))
+        out = np.full((1, 1, 1), NODATA, dtype=np.int16)
+
+        with patch.dict(os.environ, {"FORCE_SPECTRAL_INDICES": "NDVI"}):
+            forcepy_chunk(observation, out, None, None, BANDNAMES, NODATA, 1)
+
+        self.assertEqual(out[0, 0, 0], NODATA)
+
 
 if __name__ == "__main__":
     unittest.main()

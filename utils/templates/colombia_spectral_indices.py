@@ -50,6 +50,14 @@ def _safe_ratio(numerator, denominator, valid):
     return result
 
 
+def _normalized_difference(first, second, valid):
+    """Calculate a bounded normalized difference from physical reflectance."""
+    valid = valid & (first >= 0) & (second >= 0)
+    result = _safe_ratio(first - second, first + second, valid)
+    result[(result < -1.0) | (result > 1.0)] = np.nan
+    return result
+
+
 def _index_stack(inarray, bandnames, nodata, index_name):
     """Return one float32 index stack with shape [dates, rows, columns]."""
     band_lookup = {
@@ -65,32 +73,33 @@ def _index_stack(inarray, bandnames, nodata, index_name):
     bnir, bnir_valid = reflectance("BROADNIR")
 
     if index_name == "NDVI":
-        return _safe_ratio(bnir - red, bnir + red, bnir_valid & red_valid)
+        return _normalized_difference(bnir, red, bnir_valid & red_valid)
 
     if index_name == "EVI":
         blue, blue_valid = reflectance("BLUE")
         denominator = bnir + 6.0 * red - 7.5 * blue + 1.0
-        return _safe_ratio(
+        result = _safe_ratio(
             2.5 * (bnir - red),
             denominator,
-            bnir_valid & red_valid & blue_valid,
+            bnir_valid
+            & red_valid
+            & blue_valid
+            & (bnir >= 0)
+            & (red >= 0)
+            & (blue >= 0),
         )
+        # EVI can exceed one over dense vegetation, but extreme values usually
+        # indicate an unstable denominator or residual atmospheric effects.
+        result[(result < -1.0) | (result > 1.5)] = np.nan
+        return result
 
     if index_name == "NBR":
         swir2, swir2_valid = reflectance("SWIR2")
-        return _safe_ratio(
-            bnir - swir2,
-            bnir + swir2,
-            bnir_valid & swir2_valid,
-        )
+        return _normalized_difference(bnir, swir2, bnir_valid & swir2_valid)
 
     if index_name == "NDMI":
         swir1, swir1_valid = reflectance("SWIR1")
-        return _safe_ratio(
-            bnir - swir1,
-            bnir + swir1,
-            bnir_valid & swir1_valid,
-        )
+        return _normalized_difference(bnir, swir1, bnir_valid & swir1_valid)
 
     raise ValueError(f"Unsupported spectral index: {index_name}")
 
