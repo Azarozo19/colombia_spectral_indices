@@ -32,11 +32,6 @@ def docker_command(config, *arguments):
     command.extend(["run", "--rm"])
     for mount in runtime.get("mounts", []):
         command.extend(["-v", str(mount)])
-    if "FILL_INTERNAL_MONTH_GAPS" in config.get("parameters", {}):
-        fill_gaps = str(
-            config["parameters"]["FILL_INTERNAL_MONTH_GAPS"]
-        ).upper()
-        command.extend(["-e", f"FORCE_NBR_FILL_INTERNAL_GAPS={fill_gaps}"])
     if "INDICES" in config.get("parameters", {}):
         indices = ",".join(config["parameters"]["INDICES"])
         command.extend(["-e", f"FORCE_SPECTRAL_INDICES={indices}"])
@@ -52,11 +47,6 @@ def docker_command(config, *arguments):
         ]
     )
     return command
-
-
-def generate_input_feature_line(tif_path, num_layers):
-    sequence = " ".join(str(i) for i in range(1, num_layers + 1))
-    return f"INPUT_FEATURE = {tif_path} {sequence}"
 
 
 def replace_parameters(filename, replacements):
@@ -116,8 +106,6 @@ def force_process(config):
     hold = bool(config["processing"].get("hold", False))
     execute = bool(config["processing"]["execute"])
 
-    source_root = Path(__file__).resolve().parents[1]
-    skeleton = source_root / "utils" / "skel"
     definition = Path(force_ard_dir) / "datacube-definition.prj"
     if not definition.is_file():
         raise FileNotFoundError(
@@ -169,7 +157,6 @@ def force_process(config):
         if mode == "UDF":
             tsa_param = force_folder / "tsa_UDF.prm"
             force_mode = "UDF"
-            shutil.copy(skeleton / "udf_pixel.py", force_folder / "UDF_pixel.py")
         else:
             tsa_param = force_folder / "tsa.prm"
             force_mode = "TSA"

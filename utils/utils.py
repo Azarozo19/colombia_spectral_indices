@@ -5,10 +5,6 @@ import glob
 import math
 from collections import defaultdict
 import rasterio
-import yaml
-
-
-MONTHLY_BAND_PATTERN = re.compile(r"^\d{4}(0[1-9]|1[0-2])(?:_|$)")
 OVERVIEW_RESAMPLING_METHODS = {
     "nearest",
     "average",
@@ -21,36 +17,6 @@ OVERVIEW_RESAMPLING_METHODS = {
     "average_magphase",
     "mode",
 }
-
-
-def load_config(config_path):
-    with open(config_path, "r") as file:
-        config = yaml.safe_load(file)
-    return config
-
-
-def select_monthly_bands(descriptions, excluded_months):
-    """Return one-based band indexes and descriptions after month filtering."""
-    excluded_months = {int(month) for month in excluded_months}
-    invalid_months = sorted(excluded_months - set(range(1, 13)))
-    if invalid_months:
-        raise ValueError(f"Invalid excluded months: {invalid_months}")
-
-    selected = []
-    for band_index, description in enumerate(descriptions, start=1):
-        if description is None:
-            raise ValueError(f"Band {band_index} has no description")
-        match = MONTHLY_BAND_PATTERN.match(description)
-        if match is None:
-            raise ValueError(
-                f"Cannot extract YYYYMM from band {band_index}: {description!r}"
-            )
-        if int(match.group(1)) not in excluded_months:
-            selected.append((band_index, description))
-
-    if not selected:
-        raise ValueError("Month filtering removed every output band")
-    return selected
 
 
 def validate_overview_options(levels, resampling):

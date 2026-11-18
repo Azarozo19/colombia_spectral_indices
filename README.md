@@ -1,8 +1,8 @@
 # Colombia FORCE spectral indices
 
-This is a Colombia-specific copy of `SITS_force_playground`. It reads the
-existing, validated FORCE Level-2 datacube without modifying it and produces
-quality-screened spectral-index summaries plus explicit observation coverage.
+This repository is the user-facing analysis layer for the Colombia FORCE
+datacube. It reads validated Level-2 ARD without modifying it and produces
+quality-screened spectral-index summaries plus observation coverage.
 
 ## Default input
 
@@ -11,11 +11,25 @@ quality-screened spectral-index summaries plus explicit observation coverage.
 - Resolution: 10 m
 - Dates: 2025-01-18 through 2025-01-27
 - Sensors: Sentinel-2A, Sentinel-2B and Sentinel-2C
-- AOI: `/drive_mount/force_co/FORCE/aoi/colombia.geojson`
+- Example AOI: one FORCE tile, `X0034_Y0036`
 - FORCE: pinned to the same 3.10.04 container used to create the cube
 
-The cube is mounted read-only in practice: all temporary and final products are
-written below `/drive_mount/force_co/indices`.
+The cube is mounted read-only in practice. Temporary and final products are
+written to the configured `runtime.process_folder`.
+
+## Repository layout
+
+```text
+config.example.yaml                 # versioned starting configuration
+pipeline/                           # configuration and command-line entry point
+scripts/validate_spectral_outputs.py
+utils/                              # FORCE execution, mosaics, and validation
+utils/templates/colombia_spectral_indices.py
+tests/
+```
+
+`config.yaml` is intentionally local and ignored by Git so that AOIs, paths,
+debug settings, and experiments are not accidentally published.
 
 ## Products
 
@@ -64,7 +78,13 @@ Index statistics with no accepted observation remain nodata; their
 
 ## Configure the run
 
-Edit [`config.yaml`](config.yaml). The most useful settings are:
+Create a local configuration and edit it:
+
+```bash
+cp config.example.yaml config.yaml
+```
+
+The most useful settings are:
 
 ```yaml
 parameters:
@@ -138,13 +158,13 @@ before a command. This mode requires an interactive terminal. Set it to
 FORCE tiles and provenance are written below:
 
 ```text
-/drive_mount/force_co/indices/temp/colombia_spectral_indices_2025_snapshot/
+<process_folder>/temp/<project_name>/
 ```
 
 The final national mosaic is written below:
 
 ```text
-/drive_mount/force_co/indices/results/colombia_spectral_indices_2025_snapshot/
+<process_folder>/results/<project_name>/
 ```
 
 The output GeoTIFF retains band descriptions, per-band scales and units, ZSTD

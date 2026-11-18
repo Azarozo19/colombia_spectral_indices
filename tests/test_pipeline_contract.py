@@ -89,25 +89,6 @@ class PipelineContractTest(unittest.TestCase):
             "FORCE_SPECTRAL_STATISTICS=MEDIAN,P25,P75,VALID_COUNT", command
         )
 
-    def test_gap_fill_setting_is_passed_into_force_container(self):
-        config = self.base_config("/source/udf.py")
-        config["parameters"]["FILL_INTERNAL_MONTH_GAPS"] = True
-
-        command = docker_command(config, "force-higher-level", "/work/tsa.prm")
-
-        self.assertIn("FORCE_NBR_FILL_INTERNAL_GAPS=TRUE", command)
-
-    def test_gap_fill_setting_must_be_boolean(self):
-        with tempfile.TemporaryDirectory() as directory:
-            source_root = Path(directory)
-            udf = source_root / "udf.py"
-            udf.write_text("# udf\n", encoding="utf-8")
-            config = self.base_config(str(udf))
-            config["parameters"]["FILL_INTERNAL_MONTH_GAPS"] = "yes"
-
-            with self.assertRaisesRegex(ValueError, "must be true or false"):
-                normalize_config(config, source_root)
-
     def test_validation_requires_valid_count(self):
         with tempfile.TemporaryDirectory() as directory:
             source_root = Path(directory)

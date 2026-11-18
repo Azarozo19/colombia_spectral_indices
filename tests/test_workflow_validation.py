@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from force_workflow import run_workflow
+from pipeline.run import run_workflow
 
 
 class WorkflowValidationTest(unittest.TestCase):
@@ -17,10 +17,10 @@ class WorkflowValidationTest(unittest.TestCase):
             "quality_validation": {"enabled": True},
         }
 
-    @patch("force_workflow.validate_configured_outputs")
-    @patch("force_workflow.mosaicing", return_value=["/results/summary.tif"])
-    @patch("force_workflow.force_process")
-    @patch("force_workflow.create_folder_structure")
+    @patch("pipeline.run.validate_configured_outputs")
+    @patch("pipeline.run.mosaicing", return_value=["/results/summary.tif"])
+    @patch("pipeline.run.force_process")
+    @patch("pipeline.run.create_folder_structure")
     def test_validates_completed_mosaic(
         self, create_folders, force_process, mosaicing, validate
     ):
@@ -30,10 +30,10 @@ class WorkflowValidationTest(unittest.TestCase):
 
         validate.assert_called_once_with(config, ["/results/summary.tif"])
 
-    @patch("force_workflow.validate_configured_outputs")
-    @patch("force_workflow.mosaicing", return_value=["/results/summary.tif"])
-    @patch("force_workflow.force_process")
-    @patch("force_workflow.create_folder_structure")
+    @patch("pipeline.run.validate_configured_outputs")
+    @patch("pipeline.run.mosaicing", return_value=["/results/summary.tif"])
+    @patch("pipeline.run.force_process")
+    @patch("pipeline.run.create_folder_structure")
     def test_dry_run_does_not_validate_stale_outputs(
         self, create_folders, force_process, mosaicing, validate
     ):

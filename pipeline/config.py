@@ -112,10 +112,6 @@ def normalize_config(config: dict, source_root: Path) -> dict:
             raise ValueError("parameters.SCREEN_QAI must be a non-empty string")
         parameters["SCREEN_QAI"] = " ".join(screen_qai.split())
 
-        fill_internal_gaps = parameters.get("FILL_INTERNAL_MONTH_GAPS", False)
-        if not isinstance(fill_internal_gaps, bool):
-            raise ValueError("parameters.FILL_INTERNAL_MONTH_GAPS must be true or false")
-
     quality = normalized.setdefault("quality_validation", {})
     if not isinstance(quality, dict):
         raise ValueError("quality_validation must be a mapping")
