@@ -239,6 +239,14 @@ def mosaic_rasters(input_files, output_filename, output_options=None):
                 )
             for i, desc in enumerate(band_descriptions, start=1):
                 dst.set_band_description(i, desc)
+            dst.scales = tuple(
+                1.0 if desc.endswith("_VALID_COUNT") else scale_factor
+                for desc in band_descriptions
+            )
+            dst.units = tuple(
+                "observations" if desc.endswith("_VALID_COUNT") else "1"
+                for desc in band_descriptions
+            )
 
         if build_overviews:
             build_internal_overviews(
@@ -302,6 +310,7 @@ def mosaicing(config):
     else:
         tif_folder = "TSS"
 
+    output_files = []
     for aoi in aois:
         aoi_name = os.path.splitext(os.path.basename(aoi))[0]
         # colect all tif files
@@ -320,10 +329,14 @@ def mosaicing(config):
             base = os.path.basename(mosaic_files[0])
             if config['processing']['mode'].upper() == "UDF":
                 product_label = "-".join(config['parameters']['INDICES'])
+                statistics = config['parameters'].get(
+                    'STATISTICS', ['MEDIAN', 'P25', 'P75', 'VALID_COUNT']
+                )
+                metric_label = statistics[0] if len(statistics) == 1 else 'SUMMARY'
                 base = build_udf_output_name(
                     base,
                     product_label,
-                    config['parameters'].get('METRIC', 'MEDIAN'),
+                    metric_label,
                 )
             output_filename = build_delivery_output_path(proc_folder, aoi, base)
             os.makedirs(os.path.dirname(output_filename), exist_ok=True)
@@ -332,3 +345,5 @@ def mosaicing(config):
                 output_filename,
                 config.get("mosaic_output"),
             )
+            output_files.append(output_filename)
+    return output_files

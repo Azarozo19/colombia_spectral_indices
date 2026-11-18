@@ -1,8 +1,9 @@
-"""FORCE UDF for quality-screened spectral-index median composites.
+"""FORCE UDF for quality-screened spectral-index summary composites.
 
 FORCE applies ``SCREEN_QAI`` before calling this module. The UDF then computes
-each configured index per acquisition and takes the pixel-wise median across
-the requested date range. Output values are Int16 scaled by 10000.
+each configured index per acquisition and summarizes the requested date range.
+Index statistics are Int16 scaled by 10000; valid-observation counts are stored
+as unscaled Int16 values.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ import numpy as np
 
 OUTPUT_SCALE = 10000
 SUPPORTED_INDICES = ("NDVI", "EVI", "NBR", "NDMI")
+SUPPORTED_STATISTICS = ("MEDIAN", "P25", "P75", "VALID_COUNT")
 
 
 def _selected_indices():
@@ -28,6 +30,23 @@ def _selected_indices():
     if len(set(indices)) != len(indices):
         raise ValueError("FORCE_SPECTRAL_INDICES cannot contain duplicates")
     return indices
+
+
+def _selected_statistics():
+    raw = os.environ.get(
+        "FORCE_SPECTRAL_STATISTICS", ",".join(SUPPORTED_STATISTICS)
+    )
+    statistics = tuple(
+        value.strip().upper() for value in raw.split(",") if value.strip()
+    )
+    if not statistics:
+        raise ValueError("FORCE_SPECTRAL_STATISTICS cannot be empty")
+    unknown = sorted(set(statistics) - set(SUPPORTED_STATISTICS))
+    if unknown:
+        raise ValueError("Unsupported spectral statistics: " + ", ".join(unknown))
+    if len(set(statistics)) != len(statistics):
+        raise ValueError("FORCE_SPECTRAL_STATISTICS cannot contain duplicates")
+    return statistics
 
 
 def _band_index(bandnames, expected_name):
@@ -106,22 +125,55 @@ def _index_stack(inarray, bandnames, nodata, index_name):
 
 def forcepy_init(dates, sensors, bandnames):
     """Return a fixed schema so all Colombian grid tiles can be mosaicked."""
-    return [f"{index}_MEDIAN" for index in _selected_indices()]
+    return [
+        f"{index}_{statistic}"
+        for index in _selected_indices()
+        for statistic in _selected_statistics()
+    ]
+
+
+def _write_scaled_statistic(out_band, values, nodata):
+    out_band[:] = nodata
+    valid = np.isfinite(values)
+    scaled = np.rint(values[valid] * OUTPUT_SCALE)
+    scaled = np.clip(scaled, -32767, 32767).astype(np.int16)
+    out_band[valid] = scaled
 
 
 def forcepy_chunk(inarray, outarray, dates, sensors, bandnames, nodata, nproc):
-    """Compute quality-screened median indices for a FORCE processing chunk."""
+    """Compute quality-screened index summaries for a FORCE processing chunk."""
     outarray[:] = nodata
-    for output_index, index_name in enumerate(_selected_indices()):
+    output_index = 0
+    statistics = _selected_statistics()
+    for index_name in _selected_indices():
         observations = _index_stack(inarray, bandnames, nodata, index_name)
+        summaries = {}
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message="All-NaN slice encountered")
-            median = np.nanmedian(observations, axis=0)
+            if "MEDIAN" in statistics:
+                summaries["MEDIAN"] = np.nanmedian(observations, axis=0)
+            percentiles = [
+                value
+                for name, value in (("P25", 25), ("P75", 75))
+                if name in statistics
+            ]
+            if percentiles:
+                percentile_values = np.nanpercentile(
+                    observations, percentiles, axis=0
+                )
+                for percentile, values in zip(percentiles, percentile_values):
+                    summaries[f"P{percentile}"] = values
 
-        valid = np.isfinite(median)
-        scaled = np.rint(median[valid] * OUTPUT_SCALE)
-        scaled = np.clip(scaled, -32767, 32767).astype(np.int16)
-        outarray[output_index, valid] = scaled
+        for statistic in statistics:
+            if statistic == "VALID_COUNT":
+                count = np.isfinite(observations).sum(axis=0)
+                count = np.minimum(count, np.iinfo(np.int16).max).astype(np.int16)
+                outarray[output_index] = count
+            else:
+                _write_scaled_statistic(
+                    outarray[output_index], summaries[statistic], nodata
+                )
+            output_index += 1
 
 
 def forcepy_pixel(inarray, outarray, dates, sensors, bandnames, nodata, nproc):

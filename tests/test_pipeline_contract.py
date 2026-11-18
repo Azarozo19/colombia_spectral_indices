@@ -29,6 +29,7 @@ class PipelineContractTest(unittest.TestCase):
             "parameters": {
                 "FILE_PYTHON": udf_path,
                 "INDICES": ["NDVI", "NBR"],
+                "STATISTICS": ["MEDIAN", "P25", "P75", "VALID_COUNT"],
                 "SCREEN_QAI": "NODATA CLOUD_OPAQUE CLOUD_SHADOW",
             },
         }
@@ -84,6 +85,9 @@ class PipelineContractTest(unittest.TestCase):
         self.assertEqual(command[-2:], ["force-higher-level", "/work/tsa.prm"])
         self.assertNotIn("sudo", command)
         self.assertIn("FORCE_SPECTRAL_INDICES=NDVI,NBR", command)
+        self.assertIn(
+            "FORCE_SPECTRAL_STATISTICS=MEDIAN,P25,P75,VALID_COUNT", command
+        )
 
     def test_gap_fill_setting_is_passed_into_force_container(self):
         config = self.base_config("/source/udf.py")
@@ -102,6 +106,17 @@ class PipelineContractTest(unittest.TestCase):
             config["parameters"]["FILL_INTERNAL_MONTH_GAPS"] = "yes"
 
             with self.assertRaisesRegex(ValueError, "must be true or false"):
+                normalize_config(config, source_root)
+
+    def test_validation_requires_valid_count(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source_root = Path(directory)
+            udf = source_root / "udf.py"
+            udf.write_text("# udf\n", encoding="utf-8")
+            config = self.base_config(str(udf))
+            config["parameters"]["STATISTICS"] = ["MEDIAN"]
+
+            with self.assertRaisesRegex(ValueError, "include VALID_COUNT"):
                 normalize_config(config, source_root)
 
 

@@ -11,6 +11,7 @@ import yaml
 
 PROJECT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9._-]+$")
 SUPPORTED_INDICES = {"NDVI", "EVI", "NBR", "NDMI"}
+SUPPORTED_STATISTICS = {"MEDIAN", "P25", "P75", "VALID_COUNT"}
 
 
 def normalize_config(config: dict, source_root: Path) -> dict:
@@ -88,6 +89,24 @@ def normalize_config(config: dict, source_root: Path) -> dict:
             raise ValueError("parameters.INDICES cannot contain duplicates")
         parameters["INDICES"] = normalized_indices
 
+        statistics = parameters.get(
+            "STATISTICS", ["MEDIAN", "P25", "P75", "VALID_COUNT"]
+        )
+        if not isinstance(statistics, list) or not statistics:
+            raise ValueError("parameters.STATISTICS must be a non-empty list")
+        normalized_statistics = [str(statistic).upper() for statistic in statistics]
+        unknown_statistics = sorted(
+            set(normalized_statistics) - SUPPORTED_STATISTICS
+        )
+        if unknown_statistics:
+            raise ValueError(
+                "Unsupported spectral statistics: "
+                + ", ".join(unknown_statistics)
+            )
+        if len(set(normalized_statistics)) != len(normalized_statistics):
+            raise ValueError("parameters.STATISTICS cannot contain duplicates")
+        parameters["STATISTICS"] = normalized_statistics
+
         screen_qai = parameters.get("SCREEN_QAI")
         if not isinstance(screen_qai, str) or not screen_qai.strip():
             raise ValueError("parameters.SCREEN_QAI must be a non-empty string")
@@ -96,6 +115,47 @@ def normalize_config(config: dict, source_root: Path) -> dict:
         fill_internal_gaps = parameters.get("FILL_INTERNAL_MONTH_GAPS", False)
         if not isinstance(fill_internal_gaps, bool):
             raise ValueError("parameters.FILL_INTERNAL_MONTH_GAPS must be true or false")
+
+    quality = normalized.setdefault("quality_validation", {})
+    if not isinstance(quality, dict):
+        raise ValueError("quality_validation must be a mapping")
+    quality.setdefault("enabled", True)
+    quality.setdefault("minimum_valid_coverage_pct", 95.0)
+    quality.setdefault("minimum_reliable_coverage_pct", 80.0)
+    quality.setdefault("minimum_reliable_observations", 3)
+    quality.setdefault("fail_on_threshold", False)
+    for name in ("enabled", "fail_on_threshold"):
+        if not isinstance(quality[name], bool):
+            raise ValueError(f"quality_validation.{name} must be true or false")
+    for name in ("minimum_valid_coverage_pct", "minimum_reliable_coverage_pct"):
+        try:
+            value = float(quality[name])
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"quality_validation.{name} must be numeric") from exc
+        if not 0 <= value <= 100:
+            raise ValueError(f"quality_validation.{name} must be between 0 and 100")
+        quality[name] = value
+    try:
+        minimum_observations = int(quality["minimum_reliable_observations"])
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            "quality_validation.minimum_reliable_observations must be an integer"
+        ) from exc
+    if minimum_observations < 1:
+        raise ValueError(
+            "quality_validation.minimum_reliable_observations must be at least 1"
+        )
+    quality["minimum_reliable_observations"] = minimum_observations
+
+    if (
+        mode == "UDF"
+        and quality["enabled"]
+        and "VALID_COUNT" not in parameters["STATISTICS"]
+    ):
+        raise ValueError(
+            "parameters.STATISTICS must include VALID_COUNT when "
+            "quality_validation.enabled is true"
+        )
 
     return normalized
 

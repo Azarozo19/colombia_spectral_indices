@@ -28,7 +28,10 @@ class ColombiaSpectralIndicesTest(unittest.TestCase):
 
         with patch.dict(
             os.environ,
-            {"FORCE_SPECTRAL_INDICES": "NDVI,EVI,NBR,NDMI"},
+            {
+                "FORCE_SPECTRAL_INDICES": "NDVI,EVI,NBR,NDMI",
+                "FORCE_SPECTRAL_STATISTICS": "MEDIAN",
+            },
         ):
             self.assertEqual(
                 forcepy_init(None, None, BANDNAMES),
@@ -47,7 +50,13 @@ class ColombiaSpectralIndicesTest(unittest.TestCase):
         observations = np.stack([valid, invalid]).reshape((2, 10, 1, 1))
         out = np.full((1, 1, 1), NODATA, dtype=np.int16)
 
-        with patch.dict(os.environ, {"FORCE_SPECTRAL_INDICES": "NDVI"}):
+        with patch.dict(
+            os.environ,
+            {
+                "FORCE_SPECTRAL_INDICES": "NDVI",
+                "FORCE_SPECTRAL_STATISTICS": "MEDIAN",
+            },
+        ):
             forcepy_chunk(observations, out, None, None, BANDNAMES, NODATA, 1)
 
         self.assertEqual(out[0, 0, 0], 5000)
@@ -59,10 +68,40 @@ class ColombiaSpectralIndicesTest(unittest.TestCase):
         ).reshape((1, 10, 1, 1))
         out = np.full((1, 1, 1), NODATA, dtype=np.int16)
 
-        with patch.dict(os.environ, {"FORCE_SPECTRAL_INDICES": "NDVI"}):
+        with patch.dict(
+            os.environ,
+            {
+                "FORCE_SPECTRAL_INDICES": "NDVI",
+                "FORCE_SPECTRAL_STATISTICS": "MEDIAN",
+            },
+        ):
             forcepy_chunk(observation, out, None, None, BANDNAMES, NODATA, 1)
 
         self.assertEqual(out[0, 0, 0], NODATA)
+
+    def test_summary_statistics_and_valid_count(self):
+        observations = []
+        for broadnir in (3000, 8000, 18000):
+            observations.append(
+                [1000, 2000, 2000, 0, 0, 0, broadnir, 0, 3000, 1000]
+            )
+        inarray = np.asarray(observations, dtype=np.int16).reshape((3, 10, 1, 1))
+        out = np.full((4, 1, 1), NODATA, dtype=np.int16)
+
+        with patch.dict(
+            os.environ,
+            {
+                "FORCE_SPECTRAL_INDICES": "NDVI",
+                "FORCE_SPECTRAL_STATISTICS": "MEDIAN,P25,P75,VALID_COUNT",
+            },
+        ):
+            self.assertEqual(
+                forcepy_init(None, None, BANDNAMES),
+                ["NDVI_MEDIAN", "NDVI_P25", "NDVI_P75", "NDVI_VALID_COUNT"],
+            )
+            forcepy_chunk(inarray, out, None, None, BANDNAMES, NODATA, 1)
+
+        self.assertEqual(out[:, 0, 0].tolist(), [6000, 4000, 7000, 3])
 
 
 if __name__ == "__main__":

@@ -40,6 +40,9 @@ def docker_command(config, *arguments):
     if "INDICES" in config.get("parameters", {}):
         indices = ",".join(config["parameters"]["INDICES"])
         command.extend(["-e", f"FORCE_SPECTRAL_INDICES={indices}"])
+    if "STATISTICS" in config.get("parameters", {}):
+        statistics = ",".join(config["parameters"]["STATISTICS"])
+        command.extend(["-e", f"FORCE_SPECTRAL_STATISTICS={statistics}"])
     command.extend(
         [
             "-u",
